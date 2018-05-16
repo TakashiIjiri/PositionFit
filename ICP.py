@@ -6,41 +6,6 @@ import time
 import multiprocessing as multi
 import random
 
-
-def ScaleFit2(SourcePs,TargetPs):
-    print("scale fitting...")
-    start = time.time()
-
-    target_kdtree = ss.KDTree(TargetPs)
-    start = time.time()
-    LIMIT_POINT_NUM = 10**5
-    if SourcePs.shape[0] > LIMIT_POINT_NUM:
-        SamplePointNum = LIMIT_POINT_NUM
-    else :
-        SamplePointNum = SourcePs.shape[0]
-
-    SourceSamplesIndices = random.sample(range(SourcePs.shape[0]),SamplePointNum)
-
-    x_scale=0
-    y_scale=0
-    z_scale=0
-    bunbo = np.zeros(3)
-    for index in SourceSamplesIndices:
-        targetPoint = TargetPs[target_kdtree.query(SourcePs[index])[1]]
-        x_scale    += targetPoint[0]*SourcePs[index][0]
-        y_scale    += targetPoint[1]*SourcePs[index][1]
-        z_scale    += targetPoint[2]*SourcePs[index][2]
-        bunbo      += np.square(SourcePs[index])
-    
-    x_scale /= bunbo[0]
-    y_scale /= bunbo[1]
-    z_scale /= bunbo[2]
-
-    end = time.time() - start
-    print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
-
-    return abs(x_scale),abs(y_scale),abs(z_scale)
-
 def OnlyTransformICP(sourcePs,targetPs):
     prederr   = 0.0
     count     = 0
@@ -49,7 +14,7 @@ def OnlyTransformICP(sourcePs,targetPs):
     k_d_targetPs = ss.KDTree(targetPs)
     result_t = np.zeros(3)
     
-    LIMIT_POINT_NUM = 10**4
+    LIMIT_POINT_NUM = 10**5
     LIMIT_ITR_COUNT = 150
     LIMIT_NO_MOVE_COUNT = 3
     if sourcePs.shape[0] > LIMIT_POINT_NUM:
@@ -63,7 +28,7 @@ def OnlyTransformICP(sourcePs,targetPs):
         sourceSamplesIndices = random.sample(range(sourcePs.shape[0]),SamplePointNum)
 
         sourcePsCenterOfMass = np.zeros(3)
-        nearPointindices = []
+        nearPointindices     = []
         for index in sourceSamplesIndices:
             sourcePsCenterOfMass += sourcePs[index]
             nearPointindices.append(k_d_targetPs.query(sourcePs[index])[1])
@@ -178,7 +143,7 @@ def ICP(sourcePs,targetPs):
         y_scale=0
         z_scale=0
         bunbo = np.zeros(3)
-        for i,index in enumerate(SourceSamplesIndices):
+        for i,index in enumerate(sourceSamplesIndices):
             targetPoint = targetPs[nearPointindices[i]]
             x_scale    += targetPoint[0]*sourcePs[index][0]
             y_scale    += targetPoint[1]*sourcePs[index][1]
@@ -198,7 +163,7 @@ def ICP(sourcePs,targetPs):
                                 [0      ,y_scale,      0],
                                 [0      ,0      ,z_scale]])
 
-        for i in range(nesourcePs.shape[0]):
+        for i in range(sourcePs.shape[0]):
             sourcePs[i] -= sourcePsCenterOfMass
             sourcePs[i]  = np.dot(scaleMatrix,sourcePs[i])
             sourcePs[i] += sourcePsCenterOfMass

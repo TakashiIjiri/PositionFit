@@ -2,6 +2,8 @@ from objLoader import loadOBJ
 from objWriter import saveOBJ
 from ICP import OnlyTransformICP
 from ICP import ICP
+from ScaleFit import ScaleFit
+from ScaleFit import ScaleFit2
 import numpy as np
 import math
 import wx
@@ -61,114 +63,27 @@ def calcVertex(v):
     r = r + Texturetrimeanave
     return r
 
-def ScaleFit(SourcePs,TargetPs):
-    print("scale fitting...")
-
-    target_kdtree = ss.KDTree(TargetPs)
-    LIMIT_POINT_NUM = 10**5
-    if SourcePs.shape[0] > LIMIT_POINT_NUM:
-        SamplePointNum = LIMIT_POINT_NUM
-    else :
-        SamplePointNum = SourcePs.shape[0]
-
-    preerr = 0
-
-    result_xscale = 1.0
-    result_yscale = 1.0
-    result_zscale = 1.0
-
-    TRESHOLD = 0.001
-    LIMIT_ITR_COUNT = 30
-    count = 0
-
-    while(True):
-        start = time.time()
-        SourceSamplesIndices = random.sample(range(SourcePs.shape[0]),SamplePointNum)
-
-        nearPointIndices = []
-        for index in SourceSamplesIndices:
-            nearPointIndices.append(TargetPs[target_kdtree.query(SourcePs[index])[1]])
-
-
-        x_scale=0
-        y_scale=0
-        z_scale=0
-        bunbo = np.zeros(3)
-        for i,index in enumerate(SourceSamplesIndices):
-            targetPoint = TargetPs[nearPointIndices[i]]
-            x_scale    += targetPoint[0]*SourcePs[index][0]
-            y_scale    += targetPoint[1]*SourcePs[index][1]
-            z_scale    += targetPoint[2]*SourcePs[index][2]
-            bunbo      += np.square(SourcePs[index])
-        
-        x_scale /= bunbo[0]
-        y_scale /= bunbo[1]
-        z_scale /= bunbo[2]
-
-        x_scale = abs(x_scale)
-        y_scale = abs(y_scale)
-        z_scale = abs(z_scale)
-
-        SourceCenter = np.zeros(3)
-        for vertex in SourcePs:
-            SourceCenter += vertex
-        SourceCenter /= len(SourcePs)
-        scaleMatrix = np.array([[x_scale,0      ,      0],
-                                [0      ,y_scale,      0],
-                                [0      ,0      ,z_scale]])
-
-
-        for i in range(len(SourcePs)):
-            SourcePs[i] -= SourceCenter
-            SourcePs[i]  = np.dot(scaleMatrix,SourcePs[i])
-            SourcePs[i] += SourceCenter
-
-
-        err = 0.0
-        
-        for i,index in enumerate(SourceSamplesIndices):
-            targetPoint = TargetPs[nearPointIndices[i]]
-            err += np.linalg.norm(targetPoint - SourcePs[index])
-        err /= len(SourceSamplesIndices)
-
-        if abs(err - preerr) < TRESHOLD or count > LIMIT_ITR_COUNT:
-            return result_xscale , result_yscale , result_zscale
-        
-        else :
-            count += 1
-            preerr = err
-            result_xscale *= x_scale
-            result_yscale *= y_scale
-            result_zscale *= z_scale
-
-            end = time.time() - start
-            print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
-
 
 def useVertexCheck(vertices,faceVertIDs):
-    useVertices = np.copy(vertices)
     UseCheck = [False] * len(vertices)
     for vertexIDs in faceVertIDs:
         for ID in vertexIDs:
             UseCheck[ID] = True
 
     print([i for i in UseCheck if i==False])
-    nonUseIDs = []
+    useIDs = []
     for i,check in enumerate(UseCheck):
-        if(not(check)):
-            nonUseIDs.append(i)
+        if(check):
+            useIDs.append(i)
 
-    if len(nonUseIDs) > 0:
-        useVertices = np.delete(useVertices,nonUseIDs,0)
-    return useVertices
+    return useIDs
 
 def Loss(args):
     start = time.time()
     Model = args[0]
     target_k_d_tree = args[1]
-    Conversion = args[2]
     err = 0.0
-    LIMIT_POINT_NUM = 5**6
+    LIMIT_POINT_NUM = 2*10**5
     SamplePointNum = 0
 
     if len(Model) > LIMIT_POINT_NUM:
@@ -205,12 +120,11 @@ def nearlestConversion(sourceModels,targetModel,Conversions):
             minE = err
             ret_transform = Conversions[i]
         
-
+    p.close()
     return ret_transform
 
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
-    P = Pool(2)
     try:
         vertices1, uvs1, normals1, faceVertIDs1, uvIDs1, normalIDs1, vertexColors1 = loadOBJ(Texturefilepath)
         vertices2, uvs2, normals2, faceVertIDs2, uvIDs2, normalIDs2, vertexColors2 = loadOBJ(CTfilepath)
@@ -221,11 +135,21 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     Texturevertices = np.array(vertices1)
     CTvertices      = np.array(vertices2)
 
-    useTextureVertices = useVertexCheck(Texturevertices,faceVertIDs1)
-    useCTVertices      = useVertexCheck(CTvertices     ,faceVertIDs2)
+    useTextureVIndices = useVertexCheck(Texturevertices,faceVertIDs1)
+    useCTVIndices      = useVertexCheck(CTvertices     ,faceVertIDs2)
 
     TexturetriangleMean,Texturetrimeanave = triangleMean(Texturevertices,faceVertIDs1)
     CTtriangleMean     ,CTtrimeanave      = triangleMean(CTvertices     ,faceVertIDs2)
+
+    useTextureVertices = np.zeros( (len(useTextureVIndices ), 3) )
+    useCTVertices      = np.zeros( (len(useCTVIndices      ), 3) ) 
+
+    for i,index in enumerate(useTextureVIndices):
+        useTextureVertices[i] = Texturevertices[index]
+
+    for i,index in enumerate(useCTVIndices):
+        useCTVertices[i] = CTvertices[index]
+
 
     TexPCA = PCA()
     TexPCA.fit(useTextureVertices)
@@ -261,7 +185,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     transMats.append(np.dot(scaleMat,rotMat1))
 
     milerMat = np.diag([-1.0,1.0,1.0])
-    rotMat2 = np.dot(rot1,np.dot(milerMat,rot2))
+    rotMat2  = np.dot(rot1,np.dot(milerMat,rot2))
     transMats.append(np.dot(scaleMat,rotMat2))
 
     milerMat = np.diag([1.0,-1.0,1.0])
@@ -276,7 +200,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
 
     newvs = []
     for j,transMat in enumerate(transMats):
-        newvs.append(np.zeros((len(useCTVertices),3)))
+        newvs.append(np.zeros( (len(useCTVertices),3) ))
         for i,v in enumerate(useCTVertices):
             args    = [v,CTtrimeanave,transMat,Texturetrimeanave]
             newvs[j][i] = calcVertex(args)
@@ -287,7 +211,6 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     #この時点で複数のモデルのうち最もターゲットに近いモデル(正確には変換)を採用
     transMat= nearlestConversion(newvs,useTextureVertices,transMats)
 
-    
     newv = np.zeros( (len(useCTVertices),3) )
     for i,v in enumerate(useCTVertices):
         args = [v,CTtrimeanave,transMat,Texturetrimeanave]
@@ -310,11 +233,26 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
 
 
 
-
+    #実際のデータに変換を適用
     newv = np.zeros( (len(CTvertices),3) )
+    newNormal = np.zeros( (len(normals2),3) )
     for i,v in enumerate(CTvertices):
         args = [v,CTtrimeanave,transMat,Texturetrimeanave]
         newv[i] = calcVertex(args)
+
+    #鏡面変換の検出
+    if np.linalg.det(transMat)<0:
+        for i in range(len(faceVertIDs2)):#CT
+            tmp = faceVertIDs2[i][0]
+            faceVertIDs2[i][0] = faceVertIDs2[i][1]
+            faceVertIDs2[i][1] = tmp
+
+    CTNormal = np.array(normals2)
+    for i,n in enumerate(CTNormal):
+        args = [n,CTtrimeanave,transMat,Texturetrimeanave]
+        newNormal[i] = calcVertex(args)
+        newNormal[i] = newNormal[i]/np.linalg.norm(newNormal[i])
+
 
     newv = newv + t
 
@@ -330,11 +268,12 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
 
     try:
         print("ファイルセーブ")
-        saveOBJ(Savefilepath, newv, uvs2, normals2, faceVertIDs2, uvIDs2, normalIDs2, vertexColors2)
+        saveOBJ(Savefilepath, newv, uvs2, newNormal, faceVertIDs2, uvIDs2, normalIDs2, vertexColors2)
     except:
         print("ファイルセーブエラー\n")
         return False
 
+    print(varRatio(useTextureVertices,newv))
     paths = Savefilepath.split("\\")
     savef = paths[len(paths)-1]
 
