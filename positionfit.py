@@ -3,7 +3,6 @@ from objWriter import saveOBJ
 from ICP import OnlyTransformICP
 from ICP import ICP
 from ScaleFit import ScaleFit
-from ScaleFit import ScaleFit2
 import numpy as np
 import math
 import wx
