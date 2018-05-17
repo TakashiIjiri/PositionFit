@@ -20,7 +20,7 @@ def ScaleFit(SourcePs,TargetPs):
     result_zscale = 1.0
 
     TRESHOLD = 0.0001
-    LIMIT_ITR_COUNT = 30
+    LIMIT_ITR_COUNT = 5
     count = 0
     noMoveCount = 0
 
@@ -74,18 +74,17 @@ def ScaleFit(SourcePs,TargetPs):
         err /= len(SourceSamplesIndices)
             
         end = time.time() - start
+        count += 1
 
         if abs(err - preerr) < TRESHOLD or count > LIMIT_ITR_COUNT:
             noMoveCount += 1
             print(str(x_scale)+"  "+str(y_scale)+"  "+str(z_scale))
-            print("no move")
             print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
-            if noMoveCount > 3:
+            if noMoveCount > 3 or count > LIMIT_ITR_COUNT:
                 return result_xscale , result_yscale , result_zscale
         
         else :
             noMoveCount = 0
-            count += 1
             preerr = err
             result_xscale *= x_scale
             result_yscale *= y_scale

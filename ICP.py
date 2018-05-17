@@ -15,7 +15,7 @@ def OnlyTransformICP(sourcePs,targetPs):
     result_t = np.zeros(3)
     
     LIMIT_POINT_NUM = 10**5
-    LIMIT_ITR_COUNT = 150
+    LIMIT_ITR_COUNT = 30
     LIMIT_NO_MOVE_COUNT = 3
     if sourcePs.shape[0] > LIMIT_POINT_NUM:
         SamplePointNum = LIMIT_POINT_NUM
