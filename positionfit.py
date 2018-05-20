@@ -12,6 +12,7 @@ from multiprocessing import Pool,current_process
 import time
 import scipy.spatial as ss
 import random
+from Object_3D import Object_3D
 
 #1が基準。2が変換をかけるほう
 def varRatio(vectorArray1,vectorArray2) :
@@ -126,45 +127,17 @@ def nearlestConversion(sourceModels,targetModel,Conversions):
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     try:
-        vertices1, uvs1, normals1, faceVertIDs1, uvIDs1, normalIDs1, vertexColors1 = loadOBJ(Texturefilepath)
-        vertices2, uvs2, normals2, faceVertIDs2, uvIDs2, normalIDs2, vertexColors2 = loadOBJ(CTfilepath)
+        CT_Object  = Object_3D(CTfilepath)
+        Tex_Object = Object_3D(Texturefilepath) 
     except :
         print("ファイル入力エラー\n")
         return False
 
-    Texturevertices = np.array(vertices1)
-    CTvertices      = np.array(vertices2)
-
-    useTextureVIndices = useVertexCheck(Texturevertices,faceVertIDs1)
-    useCTVIndices      = useVertexCheck(CTvertices     ,faceVertIDs2)
-
-    useTextureVertices = np.zeros( (len(useTextureVIndices ), 3) )
-    useCTVertices      = np.zeros( (len(useCTVIndices      ), 3) ) 
-
-    #定義されているがメッシュ作成に使われない頂点が存在する場合があるため
-    #使われている頂点のみから変換を計算する
-    for i,index in enumerate(useTextureVIndices):
-        useTextureVertices[i] = Texturevertices[index]
-
-    for i,index in enumerate(useCTVIndices):
-        useCTVertices[i] = CTvertices[index]
-
-    CTCenter  = np.zeros(3)
-    TexCenter = np.zeros(3)
-
-    for v in useCTVertices:
-        CTCenter  += v
-    CTCenter  /= len(useCTVertices)
-
-    for v in Texturevertices:
-        TexCenter += v
-    TexCenter /= len(useTextureVertices)
-
     TexPCA = PCA()
-    TexPCA.fit(useTextureVertices)
+    TexPCA.fit(Tex_Object.getVertices())
 
     CTPCA = PCA()
-    CTPCA.fit(useCTVertices)
+    CTPCA.fit(CT_Object.getVertices())
 
     cov1 = TexPCA.get_covariance()
     cov2 = CTPCA.get_covariance ()
@@ -181,38 +154,47 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     print(eig2_val )
 
     if not(check):
-        var = math.sqrt(varRatio(useTextureVertices,useCTVertices))
+        var = math.sqrt(varRatio(Tex_Object.getVertices(),CT_Object.getVertices()))
     print("\n" + str(var))
 
+    scaleMat  = np.array([ [var,0.0,0.0,0.0],
+                           [0.0,var,0.0,0.0],
+                           [0.0,0.0,var,0.0],
+                           [0.0,0.0,0.0,1.0] ])
+
+    CT_Center  = CT_Object .getPosition()
+
+    transMat1 = np.array([ [1.0,0.0,0.0,-CT_Center[0]],
+                           [0.0,1.0,0.0,-CT_Center[1]],
+                           [0.0,0.0,1.0,-CT_Center[2]],
+                           [0.0,0.0,0.0,1.0          ] ])
+
+    transMat2 = np.array([ [1.0,0.0,0.0,CT_Center[0]],
+                           [0.0,1.0,0.0,CT_Center[1]],
+                           [0.0,0.0,1.0,CT_Center[2]],
+                           [0.0,0.0,0.0,1.0         ] ])
+
+    CT_Object.linerConversion( np.dot( transMat2,np.dot(scaleMat,transMat1) ) )
+
+
     TexPCARot = np.array(TexPCA.components_).transpose()
+
+    TexPCARot = np.array([ [TexPCARot[0][0],TexPCARot[0][1],TexPCARot[0][2],0.0],
+                           [TexPCARot[1][0],TexPCARot[1][1],TexPCARot[1][2],0.0],
+                           [TexPCARot[2][0],TexPCARot[2][1],TexPCARot[2][2],0.0],
+                           [0.0            ,0.0            ,0.0            ,1.0]])
+
     CTPCARot  = np.array(CTPCA.components_ )
-    scaleMat  = np.array([ [var,0.0,0.0],
-                          [0.0,var,0.0],
-                          [0.0,0.0,var] ])
-    rotMat1   = np.dot(TexPCARot,CTPCARot)
-    transMats = []
-    transMats.append(np.dot(scaleMat,rotMat1))
-
-    milerMat = np.diag([-1.0,1.0,-1.0]) #y軸回転
-    rotMat2  = np.dot(TexPCARot,np.dot(milerMat,CTPCARot))
-    transMats.append(np.dot(scaleMat,rotMat2))
-
-    milerMat = np.diag([-1.0,-1.0,1.0]) #z軸回転
-    rotMat3  = np.dot(TexPCARot,np.dot(milerMat,CTPCARot))
-    transMats.append(np.dot(scaleMat,rotMat3))
     
-    milerMat = np.diag([1.0,-1.0,-1.0]) #x軸回転
-    rotMat4  = np.dot(TexPCARot,np.dot(milerMat,CTPCARot))
-    transMats.append(np.dot(scaleMat,rotMat4))
+    CTPCARot = np.array([ [CTPCARot[0][0],CTPCARot[0][1],CTPCARot[0][2],0.0],
+                          [CTPCARot[1][0],CTPCARot[1][1],CTPCARot[1][2],0.0],
+                          [CTPCARot[2][0],CTPCARot[2][1],CTPCARot[2][2],0.0],
+                          [0.0           ,0.0           ,0.0           ,1.0] ])
+
 
     start = time.time()
 
-    newvs = []
-    for j,transMat in enumerate(transMats):
-        newvs.append(np.zeros( (len(useCTVertices),3) ))
-        for i,v in enumerate(useCTVertices):
-            args    = [v,CTCenter,transMat,TexCenter]
-            newvs[j][i] = calcVertex(args)
+
 
     end   = time.time() - start
     print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
