@@ -67,10 +67,19 @@ def loadOBJ(fliePath):
             uvIDs.append(uvID)
             normalIDs.append(nvID)
             numFaces += 1
-    print(fliePath)
+    print (fliePath)
     print ("numVertices: ", numVertices)
     print ("numUVs: ", numUVs)
     print ("numNormals: ", numNormals)
     print ("numFaces: ", numFaces)
-    print("\n")
+    print ("\n")
+    return vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors
+
+
+def loadOBJ_4D(filepath):
+    vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors = loadOBJ(filepath)
+
+    for i in range(len(vertices)):
+        vertices[i] = np.append( vertices[i],[1] )
+
     return vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors
