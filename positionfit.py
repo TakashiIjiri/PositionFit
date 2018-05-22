@@ -14,7 +14,7 @@ import scipy.spatial as ss
 import random
 from Object_3D import Object_3D
 
-#1が基準。2が変換をかけるほう
+
 def varRatio(vectorArray1,vectorArray2) :
     mean = np.zeros(3)
     for i in vectorArray1:
@@ -39,31 +39,6 @@ def varRatio(vectorArray1,vectorArray2) :
     var2 /= len(vectorArray2)
     return var1/var2
 
-def triangleMean(vertexarray,faceVertexIds):
-    trianglemean = []
-    trimeanave = np.zeros(3)
-    for index in faceVertexIds:
-        v1 = vertexarray[index[0]]
-        v2 = vertexarray[index[1]]
-        v3 = vertexarray[index[2]]
-        trimean = (v1 + v2 + v3)/3.0
-        trianglemean.append(trimean)
-        trimeanave += trimean
-
-    trimeanave /= len(trianglemean)
-    return trianglemean,trimeanave
-
-def calcVertex(v):
-    vertex = v[0]
-    CTtrimeanave = v[1]
-    transMat = v[2]
-    Texturetrimeanave = v[3]
-
-    r = vertex - CTtrimeanave
-    r = np.dot(transMat,r)
-    r = r + Texturetrimeanave
-    return r
-
 
 def useVertexCheck(vertices,faceVertIDs):
     UseCheck = [False] * len(vertices)
@@ -79,50 +54,68 @@ def useVertexCheck(vertices,faceVertIDs):
 
     return useIDs
 
-def Loss(args):
-    start = time.time()
-    Model = args[0]
-    target_k_d_tree = args[1]
-    err = 0.0
-    LIMIT_POINT_NUM = 10**5
-    SamplePointNum = 0
+def Loss(CT_Object,Tex_Object):
+    CT_vertices  = CT_Object .getVertices_3D()
+    Tex_vertices = Tex_Object.getVertices_3D() 
 
-    if len(Model) > LIMIT_POINT_NUM:
-        SamplePointNum = LIMIT_POINT_NUM
-    else :
-        SamplePointNum = len(Model)
-
-    sourceSamplesIndices = random.sample(range( len(Model) ),SamplePointNum)
-    for index in sourceSamplesIndices:
-        nearlest = target_k_d_tree.query(Model[index])
-        err += nearlest[0]
-    err /= SamplePointNum
+    target_KDTree = ss.KDTree(Tex_Object.getVertices_3D())
     
-    end = time.time() - start
-    print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
+    LIMIT_POINT_NUM = 10**5
 
-    return err
+    if len( CT_vertices ) >LIMIT_POINT_NUM:
+        SAMPLE_POINT_NUM = LIMIT_POINT_NUM
+    else:
+        SAMPLE_POINT_NUM = len( CT_vertices )
 
-def nearlestConversion(sourceModels,targetModel,Conversions):
-    target_k_d_tree = ss.KDTree(targetModel)
-    args = []
+    sourceSamplesIndices = random.sample(range(len( CT_vertices )),SAMPLE_POINT_NUM)
 
-    start = time.time()
-    for i in range(len(sourceModels)):
-        args.append( [ sourceModels[i],target_k_d_tree,Conversions[i] ] )
+    err = 0.0
+    for index in sourceSamplesIndices:
+        err += target_KDTree.query(CT_vertices[index])[0]
 
-    p = Pool(4)
-    result = p.map(Loss,args)
-    end = time.time() - start
-    print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
-    minE = -1
-    for i,err in enumerate(result):
-        if err < minE or minE < 0:
-            minE = err
-            ret_transform = Conversions[i]
-        
-    p.close()
-    return ret_transform
+    return err / len(sourceSamplesIndices)
+
+
+def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
+
+    CT_Center = CT_Object.getPosition()
+    #重心座標系に直すための行列
+    transMat1 = np.array([ [1.0,0.0,0.0,-CT_Center[0]],
+                           [0.0,1.0,0.0,-CT_Center[1]],
+                           [0.0,0.0,1.0,-CT_Center[2]],
+                           [0.0,0.0,0.0,       1.0   ] 
+                        ])
+                        
+    transMat2 = np.array([ [1.0,0.0,0.0,CT_Center[0]],
+                           [0.0,1.0,0.0,CT_Center[1]],
+                           [0.0,0.0,1.0,CT_Center[2]],
+                           [0.0,0.0,0.0,       1.0  ] 
+                        ])
+
+    CT_Object.linerConversion( np.dot( transMat2,np.dot( CT_PCARot,transMat1 ) ) )
+
+    I_Mat = np.diag([ 1.0, 1.0, 1.0,1.0])
+    Rot_X = np.diag([ 1.0,-1.0,-1.0,1.0])
+    Rot_Y = np.diag([-1.0, 1.0,-1.0,1.0])
+    Rot_Z = np.diag([-1.0,-1.0, 1.0,1.0])
+
+    nearlestConversionMat = None
+    minErr = -1.0
+    for Rot in [I_Mat,Rot_X,Rot_Y,Rot_Z]:
+        Rot = np.dot(TexPCARot,Rot)
+
+        CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot,transMat1 ) ) )
+
+        err = Loss(CT_Object,Tex_Object)
+        print("err = ",err)
+        if err < minErr or minErr < 0:
+            minErr = err
+            nearlestConversionMat =  Rot
+            print(nearlestConversionMat)
+
+        CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot.transpose(),transMat1 ) ) )
+ 
+    CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
 
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
@@ -130,20 +123,20 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
         CT_Object  = Object_3D(CTfilepath)
         Tex_Object = Object_3D(Texturefilepath) 
     except :
-        print("ファイル入力エラー\n")
+        print("file input err\n")
         return False
 
     TexPCA = PCA()
-    TexPCA.fit(Tex_Object.getVertices())
+    TexPCA.fit(Tex_Object.getVertices_3D())
 
     CTPCA = PCA()
-    CTPCA.fit(CT_Object.getVertices())
+    CTPCA.fit(CT_Object.getVertices_3D())
 
-    cov1 = TexPCA.get_covariance()
-    cov2 = CTPCA.get_covariance ()
+    Tex_Cov = TexPCA.get_covariance()
+    CT_Cov  = CTPCA.get_covariance ()
 
-    eig1_val,eig1_vec = np.linalg.eig(cov1)
-    eig2_val,eig2_vec = np.linalg.eig(cov2)
+    eig1_val,eig1_vec = np.linalg.eig(Tex_Cov)
+    eig2_val,eig2_vec = np.linalg.eig(CT_Cov )
 
     eig1_val = np.sort(eig1_val)
     eig2_val = np.sort(eig2_val)
@@ -154,7 +147,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     print(eig2_val )
 
     if not(check):
-        var = math.sqrt(varRatio(Tex_Object.getVertices(),CT_Object.getVertices()))
+        var = np.linalg.det(Tex_Cov) / np.linalg.det(CT_Cov)
     print("\n" + str(var))
 
     scaleMat  = np.array([ [var,0.0,0.0,0.0],
@@ -163,16 +156,17 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [0.0,0.0,0.0,1.0] ])
 
     CT_Center  = CT_Object .getPosition()
+    Tex_Center = Tex_Object.getPosition() 
 
     transMat1 = np.array([ [1.0,0.0,0.0,-CT_Center[0]],
                            [0.0,1.0,0.0,-CT_Center[1]],
                            [0.0,0.0,1.0,-CT_Center[2]],
                            [0.0,0.0,0.0,1.0          ] ])
 
-    transMat2 = np.array([ [1.0,0.0,0.0,CT_Center[0]],
-                           [0.0,1.0,0.0,CT_Center[1]],
-                           [0.0,0.0,1.0,CT_Center[2]],
-                           [0.0,0.0,0.0,1.0         ] ])
+    transMat2 = np.array([ [1.0,0.0,0.0,Tex_Center[0]],
+                           [0.0,1.0,0.0,Tex_Center[1]],
+                           [0.0,0.0,1.0,Tex_Center[2]],
+                           [0.0,0.0,0.0,1.0          ] ])
 
     CT_Object.linerConversion( np.dot( transMat2,np.dot(scaleMat,transMat1) ) )
 
@@ -184,66 +178,37 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [TexPCARot[2][0],TexPCARot[2][1],TexPCARot[2][2],0.0],
                            [0.0            ,0.0            ,0.0            ,1.0]])
 
-    CTPCARot  = np.array(CTPCA.components_ )
+    CT_PCARot  = np.array(CTPCA.components_ )
     
-    CTPCARot = np.array([ [CTPCARot[0][0],CTPCARot[0][1],CTPCARot[0][2],0.0],
-                          [CTPCARot[1][0],CTPCARot[1][1],CTPCARot[1][2],0.0],
-                          [CTPCARot[2][0],CTPCARot[2][1],CTPCARot[2][2],0.0],
-                          [0.0           ,0.0           ,0.0           ,1.0] ])
+    CT_PCARot = np.array([ [CT_PCARot[0][0],CT_PCARot[0][1],CT_PCARot[0][2],0.0],
+                           [CT_PCARot[1][0],CT_PCARot[1][1],CT_PCARot[1][2],0.0],
+                           [CT_PCARot[2][0],CT_PCARot[2][1],CT_PCARot[2][2],0.0],
+                           [0.0            ,0.0            ,0.0            ,1.0] ])
 
 
     start = time.time()
 
-
+    nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot)
 
     end   = time.time() - start
     print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
-    
-    #この時点で複数のモデルのうち最もターゲットに近いモデル(正確には変換)を採用
-    transMat= nearlestConversion(newvs,useTextureVertices,transMats)
 
+    t = OnlyTransformICP(CT_Object.getVertices_3D(),Tex_Object.getVertices_3D())
 
-    #デバッグ
-    for t in transMats:
-        print(t)
-        print("\n")
+    transformMat = np.array([ [1.0,0.0,0.0,t[0]],
+                              [0.0,1.0,0.0,t[1]],
+                              [0.0,0.0,1.0,t[2]],
+                              [0.0,0.0,0.0,1.0 ]
+                            ])
 
-    print(transMat)
-    print("\n")
-    #ここまで
+    CT_Object.linerConversion(transformMat)
 
-    newv = np.zeros( (len(useCTVertices),3) )
-    for i,v in enumerate(useCTVertices):
-        args = [v,CTCenter,transMat,TexCenter]
-        newv[i] = calcVertex(args)
-
-    t = OnlyTransformICP(newv,useTextureVertices)
-
-    newv = newv + t
-
-
-
-    #実際のデータに変換を適用
-    newv = np.zeros( (len(CTvertices),3) )
-    newNormal = np.zeros( (len(normals2),3) )
-    for i,v in enumerate(CTvertices):
-        args = [v,CTCenter,transMat,TexCenter]
-        newv[i] = calcVertex(args)
-
-    #鏡面変換の検出
-    if np.linalg.det(transMat)<0:
-        for i in range(len(faceVertIDs2)):#CT
-            tmp = faceVertIDs2[i][0]
-            faceVertIDs2[i][0] = faceVertIDs2[i][1]
-            faceVertIDs2[i][1] = tmp
-
-    newv = newv + t
 
     try:
-        print("ファイルセーブ")
-        saveOBJ(Savefilepath, newv, uvs2, normals2, faceVertIDs2, uvIDs2, normalIDs2, vertexColors2)
+        print("file save")
+        CT_Object.saveOBJ(Savefilepath)
     except:
-        print("ファイルセーブエラー\n")
+        print("file save err\n")
         return False
 
     paths = Savefilepath.split("\\")

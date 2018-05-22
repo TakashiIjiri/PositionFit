@@ -20,11 +20,7 @@ def calcTriangleArea(pos1,pos2,pos3):
 
     vector1_2 = pos2 - pos1
     vector1_3 = pos3 - pos1
-    cross = np.cross(vector1_2,vector1_3)
-    
-    print(vector1_2)
-    print(vector1_3)
-    print(cross)
+    cross     = np.cross(vector1_2,vector1_3)
 
     return np.linalg.norm(cross)/2
 
@@ -69,13 +65,13 @@ class Object_3D():
             self.__m_vertexColors = None
             return
 
-        self.__m_vertices     = vertices
-        self.__m_uvs          = uvs
-        self.__m_normals      = normals
-        self.__m_faceIDs      = faceVertIDs
-        self.__m_uvIDs        = uvIDs
-        self.__m_normalIDs    = normalIDs
-        self.__m_vertexColors = vertexColors
+        self.__m_vertices     = np.array(vertices)
+        self.__m_uvs          = np.array(uvs)
+        self.__m_normals      = np.array(normals)
+        self.__m_faceIDs      = np.array(faceVertIDs)
+        self.__m_uvIDs        = np.array(uvIDs)
+        self.__m_normalIDs    = np.array(normalIDs)
+        self.__m_vertexColors = np.array(vertexColors)
         self.__m_center       = calcCenter(self.__m_vertices)
     
         self.defineMaterialPoints()
@@ -88,13 +84,13 @@ class Object_3D():
             print("OBJ input err")
             return
 
-        self.__m_vertices     = vertices
-        self.__m_uvs          = uvs
-        self.__m_normals      = normals
-        self.__m_faceIDs      = faceVertIDs
-        self.__m_uvIDs        = uvIDs
-        self.__m_normalIDs    = normalIDs
-        self.__m_vertexColors = vertexColors
+        self.__m_vertices     = np.array(vertices)
+        self.__m_uvs          = np.array(uvs)
+        self.__m_normals      = np.array(normals)
+        self.__m_faceIDs      = np.array(faceVertIDs)
+        self.__m_uvIDs        = np.array(uvIDs)
+        self.__m_normalIDs    = np.array(normalIDs)
+        self.__m_vertexColors = np.array(vertexColors)
         self.__m_center       = calcCenter(self.__m_vertices)
 
         self.defineMaterialPoints()
@@ -142,24 +138,36 @@ class Object_3D():
         self.__m_material_points_center   /= self.__m_mass
         self.__m_material_points_center[3] = 1.0
 
-        #デバッグ
-        print("material point")
-        print(self.__m_material_points[0].m_position,self.__m_material_points[0].m_mass)
 
 
     def linerConversion(self,conversionMatrix):
         try:
             for i in range( len(self.__m_vertices) ):
-                self.__m_vertices[i]  = np.dot( conversionMatrix, self.__m_vertices )
+                self.__m_vertices[i]  = np.dot( conversionMatrix, self.__m_vertices[i] )
                 self.__m_vertices[i] /= self.__m_vertices[i][3]
-        except:
+
+            self.__m_center = calcCenter(self.__m_vertices)
+
+        except Exception as e:
+            print ('type:' + str(type(e)))
+            print ('args:' + str(e.args))
+            print ('e自身:' + str(e))
             print("conversion err")
 
 
 
-    def getVertices(self):
+    def getVertices_4D(self):
         return self.__m_vertices
 
+
+    def getVertices_3D(self):
+        vertices = np.zeros( (len(self.__m_vertices),3) )
+        for i in range( len(vertices) ):
+            vertices[i][0] = self.__m_vertices[i][0] / self.__m_vertices[i][3]
+            vertices[i][1] = self.__m_vertices[i][1] / self.__m_vertices[i][3]
+            vertices[i][2] = self.__m_vertices[i][2] / self.__m_vertices[i][3]
+
+        return vertices
 
     def getPosition(self):
         return self.__m_center

@@ -1,9 +1,16 @@
 import numpy as np
+from Object_3D import Object_3D
 
+def conversion(obj,matrix):
+    obj.linerConversion(a)
+    
 
+obj = Object_3D("./test.obj")
 
-a = np.array([[1,1,1],[2,2,2],[3,3,3]])
+print(obj.getVertices())
 
-b = np.diag( [1,1,1,1] )
+a = np.array([[2,0,0,0],[0,2,0,0],[0,0,2,0],[0,0,0,1]])
 
-print(a+b)
+conversion(obj,a)
+
+print(obj.getVertices())
