@@ -22,9 +22,10 @@ def varRatio(vectorArray1,vectorArray2) :
     mean /= len(vectorArray1)
 
     var1 = 0.0
+    vec= np.zeros(3)
     for i in vectorArray1:
-        i = i - mean
-        var1 += np.dot(i,i)
+        vec = i - mean
+        var1 += np.dot(vec,vec)
     var1 /= len(vectorArray1)
 
     mean = np.zeros(3)
@@ -33,9 +34,10 @@ def varRatio(vectorArray1,vectorArray2) :
     mean /= len(vectorArray2)
 
     var2 = 0.0
+    vec= np.zeros(3)
     for j in vectorArray2:
-        j = j - mean
-        var2 += np.dot(j,j)
+        vec = j - mean
+        var2 += np.dot(vec,vec)
     var2 /= len(vectorArray2)
     return var1/var2
 
@@ -56,10 +58,10 @@ def useVertexCheck(vertices,faceVertIDs):
 
 def Loss(CT_Object,Tex_Object):
     CT_vertices  = CT_Object .getVertices_3D()
-    Tex_vertices = Tex_Object.getVertices_3D() 
+    Tex_vertices = Tex_Object.getVertices_3D()
 
     target_KDTree = ss.KDTree(Tex_Object.getVertices_3D())
-    
+
     LIMIT_POINT_NUM = 10**5
 
     if len( CT_vertices ) >LIMIT_POINT_NUM:
@@ -83,13 +85,13 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
     transMat1 = np.array([ [1.0,0.0,0.0,-CT_Center[0]],
                            [0.0,1.0,0.0,-CT_Center[1]],
                            [0.0,0.0,1.0,-CT_Center[2]],
-                           [0.0,0.0,0.0,       1.0   ] 
+                           [0.0,0.0,0.0,       1.0   ]
                         ])
-                        
+
     transMat2 = np.array([ [1.0,0.0,0.0,CT_Center[0]],
                            [0.0,1.0,0.0,CT_Center[1]],
                            [0.0,0.0,1.0,CT_Center[2]],
-                           [0.0,0.0,0.0,       1.0  ] 
+                           [0.0,0.0,0.0,       1.0  ]
                         ])
 
     CT_Object.linerConversion( np.dot( transMat2,np.dot( CT_PCARot,transMat1 ) ) )
@@ -114,14 +116,14 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
             print(nearlestConversionMat)
 
         CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot.transpose(),transMat1 ) ) )
- 
+
     CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
 
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     try:
         CT_Object  = Object_3D(CTfilepath)
-        Tex_Object = Object_3D(Texturefilepath) 
+        Tex_Object = Object_3D(Texturefilepath)
     except :
         print("file input err\n")
         return False
@@ -147,7 +149,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     print(eig2_val )
 
     if not(check):
-        var = np.linalg.det(Tex_Cov) / np.linalg.det(CT_Cov)
+        var = varRatio(CT_Object.getVertices_3D(),Tex_Object.getVertices_3D())
     print("\n" + str(var))
 
     scaleMat  = np.array([ [var,0.0,0.0,0.0],
@@ -156,7 +158,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [0.0,0.0,0.0,1.0] ])
 
     CT_Center  = CT_Object .getPosition()
-    Tex_Center = Tex_Object.getPosition() 
+    Tex_Center = Tex_Object.getPosition()
 
     transMat1 = np.array([ [1.0,0.0,0.0,-CT_Center[0]],
                            [0.0,1.0,0.0,-CT_Center[1]],
@@ -179,7 +181,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [0.0            ,0.0            ,0.0            ,1.0]])
 
     CT_PCARot  = np.array(CTPCA.components_ )
-    
+
     CT_PCARot = np.array([ [CT_PCARot[0][0],CT_PCARot[0][1],CT_PCARot[0][2],0.0],
                            [CT_PCARot[1][0],CT_PCARot[1][1],CT_PCARot[1][2],0.0],
                            [CT_PCARot[2][0],CT_PCARot[2][1],CT_PCARot[2][2],0.0],
