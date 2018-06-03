@@ -1,7 +1,7 @@
 import numpy as np
 from objLoader import loadOBJ_4D
 from objWriter import saveOBJ
-
+import copy
 
 
 def calcTriangleArea(pos1,pos2,pos3):
@@ -142,11 +142,11 @@ class Object_3D():
 
     def linerConversion(self,conversionMatrix):
         try:
+            self.__m_vertices = np.dot(conversionMatrix, self.__m_vertices.T).T
             for i in range( len(self.__m_vertices) ):
-                self.__m_vertices[i]  = np.dot( conversionMatrix, self.__m_vertices[i] )
                 self.__m_vertices[i] /= self.__m_vertices[i][3]
 
-            self.__m_center = calcCenter(self.__m_vertices)
+            self.__m_center = np.mean( self.__m_vertices, axis = 0 )
 
         except Exception as e:
             print ('type:' + str(type(e)))
@@ -157,7 +157,7 @@ class Object_3D():
 
 
     def getVertices_4D(self):
-        return self.__m_vertices
+        return copy.deepcopy(self.__m_vertices)
 
 
     def getVertices_3D(self):
@@ -169,10 +169,19 @@ class Object_3D():
 
         return vertices
 
-    def getPosition(self):
+
+    def getPosition_4D(self):
         return self.__m_center
 
+    def getPosition_3D(self):
+        center = np.zeros(3)
+        center[0] = self.__m_center[0] / self.__m_center[3] 
+        center[1] = self.__m_center[1] / self.__m_center[3] 
+        center[2] = self.__m_center[2] / self.__m_center[3] 
     
+        return center
+
+
     def getMaterialPoints(self):
         return self.__m_material_points
 
@@ -184,7 +193,16 @@ class Object_3D():
     def getMass(self):
         return self.__m_mass
 
+    def setVertices_3D(self,vertices):
+        vertices_4D = np.zeros( (len(vertices), 4) )
 
+        for i in range(len(vertices_4D)):
+            vertices_4D[i][0] = vertices[i][0]
+            vertices_4D[i][1] = vertices[i][1]
+            vertices_4D[i][2] = vertices[i][2]
+            vertices_4D[i][3] = 1.0
+
+        self.__m_vertices = vertices_4D
 
 if __name__ =="__main__":
     object3D = Object_3D("C:\\Users\\光\\Documents\\GitHub\\PositionFit\\test.obj")
