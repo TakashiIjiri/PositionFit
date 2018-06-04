@@ -1,5 +1,7 @@
 from scipy.spatial import KDTree
 import numpy as np
+import random
+import time
 
 def calcRigidTranformation(MatA, MatB):
     A, B = np.copy(MatA), np.copy(MatB)
@@ -24,17 +26,30 @@ class ICP(object):
         self.sourcePoints = sourcePoints
         self.kdtree = KDTree(self.targetPoints)
 
-    def calculate(self, iter):
+    def calculate(self, iter, LIMIT_POINT_NUM=10**5):
         old_points = np.copy(self.sourcePoints)
         new_points = np.copy(self.sourcePoints)
 
+        if len( self.sourcePoints ) >LIMIT_POINT_NUM:
+            SAMPLE_POINT_NUM = LIMIT_POINT_NUM
+        else:
+            SAMPLE_POINT_NUM = len( self.sourcePoints )
+
         for i in range(iter):
-            neighbor_idx = self.kdtree.query(old_points)[1]
+            start = time.time()
+
+            sourceSamplesIndices = random.sample( range( len(self.sourcePoints) ), SAMPLE_POINT_NUM )
+            samplePoints = old_points[sourceSamplesIndices]
+
+            neighbor_idx = self.kdtree.query(samplePoints)[1]
             targets = self.targetPoints[neighbor_idx]
-            R, T = calcRigidTranformation(old_points, targets)
+            R, T = calcRigidTranformation(samplePoints, targets)
             new_points = np.dot(R, old_points.T).T + T
 
-            if  np.sum(np.abs(old_points - new_points)) < 0.000000001:
+            end = time.time() - start
+            print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
+
+            if  np.mean(np.abs(old_points - new_points)) < 0.000000001:
                 break
 
             old_points = np.copy(new_points)
