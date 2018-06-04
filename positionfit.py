@@ -99,7 +99,7 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
 
         #debug
         try:
-            filename = "C:\\Users\\光\\Desktop\\debugOBJ" + str(count) + ".obj"
+            filename = "C:\\Users\\pikap\\Desktop\\debugOBJ" + str(count) + ".obj"
             CT_Object.saveOBJ(filename)
             count += 1
         except:
@@ -115,7 +115,7 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
 
     #debug
     try:
-        filename = "C:\\Users\\光\\Desktop\\debugOBJ" + str(count) + ".obj"
+        filename = "C:\\Users\\pikap\\Desktop\\debugOBJ" + str(count) + ".obj"
         CT_Object.saveOBJ(filename)
         count += 1
     except:

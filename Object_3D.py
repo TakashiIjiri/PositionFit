@@ -158,8 +158,9 @@ class Object_3D():
                                           [conversionMatrix[1][0],conversionMatrix[1][1],conversionMatrix[1][2]],
                                           [conversionMatrix[2][0],conversionMatrix[2][1],conversionMatrix[2][2]] ])
 
-            self.__m_normals = np.dot(conversionMat_3D,self.__m_normals.T).T
-            self.__m_normals = normalize(self.__m_normals,axis=1)
+            if len(self.__m_normals) > 0:
+                self.__m_normals = np.dot(conversionMat_3D,self.__m_normals.T).T
+                self.__m_normals = normalize(self.__m_normals,axis=1)
 
         except Exception as e:
             print ('type:' + str(type(e)))
