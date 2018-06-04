@@ -49,7 +49,7 @@ def Loss(CT_Object,Tex_Object):
 
     target_KDTree = ss.KDTree(Tex_Object.getVertices_3D())
 
-    LIMIT_POINT_NUM = 10**6
+    LIMIT_POINT_NUM = 2*10**5
 
     if len( CT_vertices ) >LIMIT_POINT_NUM:
         SAMPLE_POINT_NUM = LIMIT_POINT_NUM
@@ -58,10 +58,8 @@ def Loss(CT_Object,Tex_Object):
 
     sourceSamplesIndices = random.sample( range( len( CT_vertices ) ),SAMPLE_POINT_NUM )
 
-    err = 0.0 
-    err = np.mean( target_KDTree(CT_vertices[sourceSamplesIndices])[0] )
-    
-    print("err = ", err)
+    err = 0.0
+    err = np.mean( target_KDTree.query(CT_vertices[sourceSamplesIndices])[0] )
 
     return err
 
@@ -115,8 +113,16 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
 
         CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot.transpose(),transMat1 ) ) )
 
-    CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
+    #debug
+    try:
+        filename = "C:\\Users\\光\\Desktop\\debugOBJ" + str(count) + ".obj"
+        CT_Object.saveOBJ(filename)
+        count += 1
+    except:
+        pass
 
+
+    CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     try:
@@ -147,7 +153,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     print(eig2_val )
 
     if not(check):
-        var = varRatio(CT_Object.getVertices_3D(),Tex_Object.getVertices_3D())
+        var = varRatio(Tex_Object.getVertices_3D(), CT_Object.getVertices_3D())
     print("\n" + str(var))
 
     scaleMat  = np.array([ [var,0.0,0.0,0.0],
@@ -186,6 +192,16 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [0.0            ,0.0            ,0.0            ,1.0] ])
 
 
+    #debug
+    if np.linalg.det(TexPCARot) < 0:
+        print("tex debug")
+        TexPCARot[:,0] = (-1 * TexPCARot[:,0]).T
+
+    if np.linalg.det(CT_PCARot) < 0:
+        print("CT debug")
+        CT_PCARot[0] = -1 * CT_PCARot[0]
+
+
     start = time.time()
 
     nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot)
@@ -195,7 +211,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
 
 
     icp = ICP(Tex_Object.getVertices_3D(), CT_Object.getVertices_3D())
-    new_vertices = icp.calculate(15)
+    new_vertices = icp.calculate(30)
     CT_Object.setVertices_3D(new_vertices)
 
 

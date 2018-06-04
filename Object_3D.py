@@ -4,6 +4,12 @@ from objWriter import saveOBJ
 import copy
 
 
+def normalize(v, axis=-1, order=2):
+    l2 = np.linalg.norm(v, ord = order, axis=axis, keepdims=True)
+    l2[l2==0] = 1
+    return v/l2
+
+
 def calcTriangleArea(pos1,pos2,pos3):
     if len(pos1) == 4:
         pos1 /= pos1[3]
@@ -73,10 +79,10 @@ class Object_3D():
         self.__m_normalIDs    = np.array(normalIDs)
         self.__m_vertexColors = np.array(vertexColors)
         self.__m_center       = calcCenter(self.__m_vertices)
-    
+
         self.defineMaterialPoints()
 
-    
+
     def loadOBJ(self,OBJ_FilePath):
         try:
             vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors = loadOBJ_4D(OBJ_FilePath)
@@ -95,18 +101,18 @@ class Object_3D():
 
         self.defineMaterialPoints()
 
-    
+
     def saveOBJ(self,OBJ_FilePath):
         try:
-            saveOBJ( 
-                     OBJ_FilePath         , 
-                     self.__m_vertices    , 
-                     self.__m_uvs         , 
-                     self.__m_normals     , 
-                     self.__m_faceIDs     , 
-                     self.__m_uvIDs       , 
-                     self.__m_normalIDs   , 
-                     self.__m_vertexColors 
+            saveOBJ(
+                     OBJ_FilePath         ,
+                     self.__m_vertices    ,
+                     self.__m_uvs         ,
+                     self.__m_normals     ,
+                     self.__m_faceIDs     ,
+                     self.__m_uvIDs       ,
+                     self.__m_normalIDs   ,
+                     self.__m_vertexColors
                     )
         except:
             print("OBJ save err")
@@ -118,7 +124,7 @@ class Object_3D():
         self.__m_material_points        = []
         self.__m_material_points_center = np.zeros(4)
         self.__m_mass                   = 0.0
- 
+
         for indices in self.__m_faceIDs:
             center = np.zeros(4)
             for index in indices:
@@ -129,7 +135,7 @@ class Object_3D():
 
             center /= len(indices)
             mass    = calcTriangleArea(self.__m_vertices[indices[0]],self.__m_vertices[indices[1]],self.__m_vertices[indices[2]])
-            
+
             Material_P = MaterialPoint(center,mass)
             self.__m_material_points.append(Material_P)
             self.__m_mass += mass
@@ -147,6 +153,13 @@ class Object_3D():
                 self.__m_vertices[i] /= self.__m_vertices[i][3]
 
             self.__m_center = np.mean( self.__m_vertices, axis = 0 )
+
+            conversionMat_3D = np.array([ [conversionMatrix[0][0],conversionMatrix[0][1],conversionMatrix[0][2]],
+                                          [conversionMatrix[1][0],conversionMatrix[1][1],conversionMatrix[1][2]],
+                                          [conversionMatrix[2][0],conversionMatrix[2][1],conversionMatrix[2][2]] ])
+
+            self.__m_normals = np.dot(conversionMat_3D,self.__m_normals.T).T
+            self.__m_normals = normalize(self.__m_normals,axis=1)
 
         except Exception as e:
             print ('type:' + str(type(e)))
@@ -175,10 +188,10 @@ class Object_3D():
 
     def getPosition_3D(self):
         center = np.zeros(3)
-        center[0] = self.__m_center[0] / self.__m_center[3] 
-        center[1] = self.__m_center[1] / self.__m_center[3] 
-        center[2] = self.__m_center[2] / self.__m_center[3] 
-    
+        center[0] = self.__m_center[0] / self.__m_center[3]
+        center[1] = self.__m_center[1] / self.__m_center[3]
+        center[2] = self.__m_center[2] / self.__m_center[3]
+
         return center
 
 
@@ -206,5 +219,3 @@ class Object_3D():
 
 if __name__ =="__main__":
     object3D = Object_3D("C:\\Users\\光\\Documents\\GitHub\\PositionFit\\test.obj")
-
-
