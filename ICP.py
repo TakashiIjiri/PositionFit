@@ -26,7 +26,7 @@ class ICP(object):
         self.sourcePoints = sourcePoints
         self.kdtree = KDTree(self.targetPoints)
 
-    def calculate(self, iter, LIMIT_POINT_NUM=10**5):
+    def calculate(self, iter, LIMIT_POINT_NUM=10**5,THRESHOLD=0.001):
         old_points = np.copy(self.sourcePoints)
         new_points = np.copy(self.sourcePoints)
 
@@ -49,7 +49,7 @@ class ICP(object):
             end = time.time() - start
             print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
 
-            if  np.mean(np.abs(old_points - new_points)) < 0.000000001:
+            if  np.mean(np.abs(old_points - new_points)) < THRESHOLD:
                 break
 
             old_points = np.copy(new_points)
