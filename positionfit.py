@@ -97,6 +97,7 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
 
         err = Loss(CT_Object,Tex_Object)
 
+
         #debug
         try:
             filename = "C:\\Users\\光\\Desktop\\debugOBJ" + str(count) + ".obj"
@@ -105,13 +106,18 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
         except:
             pass
 
+
         print("err = ",err)
         if err < minErr or minErr < 0:
             minErr = err
-            nearlestConversionMat =  Rot
+            nearlestConversionMat = np.copy(Rot)
             print(nearlestConversionMat)
+            print("\n")
 
         CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot.transpose(),transMat1 ) ) )
+
+    CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
+
 
     #debug
     try:
@@ -120,9 +126,6 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
         count += 1
     except:
         pass
-
-
-    CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     try:
