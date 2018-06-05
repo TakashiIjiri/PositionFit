@@ -26,7 +26,7 @@ class Window(wx.Frame):
         font = wx.Font(18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
 
         self.panel_ui = wx.Panel(self,-1,pos = (50,50),size = (800,300))
-        self.checkbox = wx.CheckBox(self.panel_ui,-1,"倍率を手動で入力するならチェック")
+        self.checkbox = wx.CheckBox(self.panel_ui,-1,"大きさを手動で入力するならチェック")
         self.checkbox.Bind(wx.EVT_CHECKBOX,self.state_change_checkbox)
         self.checkbox.SetValue(False)
         self.checkbox.SetFont(font)

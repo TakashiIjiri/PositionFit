@@ -44,7 +44,6 @@ def useVertexCheck(vertices,faceVertIDs):
 
     return useIDs
 
-
 def Loss(CT_Object,Tex_Object):
     CT_vertices  = CT_Object .getVertices_3D()
 
@@ -117,7 +116,6 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
 
         CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot.transpose(),transMat1 ) ) )
 
-
     CT_Object.linerConversion( np.dot( transMat2,np.dot( nearlestConversionMat,transMat1 ) ) )
 
 
@@ -128,7 +126,6 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
         count += 1
     except:
         pass
-
 
 def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     try:
@@ -144,10 +141,8 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
     CTPCA = PCA()
     CTPCA.fit(CT_Object.getVertices_3D())
 
-
     Tex_Cov = TexPCA.get_covariance()
-    CT_Cov  = CTPCA .get_covariance()
-
+    CT_Cov  = CTPCA.get_covariance ()
 
     eig1_val,eig1_vec = np.linalg.eig(Tex_Cov)
     eig2_val,eig2_vec = np.linalg.eig(CT_Cov )
@@ -181,7 +176,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [0.0,1.0,0.0,Tex_Center[1]],
                            [0.0,0.0,1.0,Tex_Center[2]],
                            [0.0,0.0,0.0,1.0          ] ])
-    #拡大縮小、重心合わせだけ最初にやっておく
+    #拡大縮小だけ最初にやっておく
     CT_Object.linerConversion( np.dot( transMat2,np.dot(scaleMat,transMat1) ) )
 
 
@@ -200,6 +195,7 @@ def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
                            [0.0            ,0.0            ,0.0            ,1.0] ])
 
 
+    #debug
     if np.linalg.det(TexPCARot) < 0:
         print("tex debug")
         TexPCARot[:,0] = (-1 * TexPCARot[:,0]).T
