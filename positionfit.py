@@ -10,6 +10,18 @@ import random
 from Object_3D import Object_3D
 
 
+
+def meanDistFromOrigin( verts ) :
+    sum = 0
+    for v in verts :
+        sum += math.sqrt( np.dot(v, v) )
+    return sum / len(targetVertices)
+
+def meanDistRatio_FromGravityCenter(trgtVerts, srcVerts) :
+    return meanDistFromOrigin( trgtVerts - calcCenter(trgtVerts))
+         / meanDistFromOrigin( srcVerts  - calcCenter(srcVerts))
+
+"""
 def varRatio(targetVertices,sourceVertices) :
     targetMean = np.mean( targetVertices, axis=0 )
     targetVar  = 0.0
@@ -43,29 +55,26 @@ def useVertexCheck(vertices,faceVertIDs):
             useIDs.append(i)
 
     return useIDs
+"""
 
-
-def Loss(CT_Object,Tex_Object):
-    CT_vertices  = CT_Object .getVertices_3D()
-
-    target_KDTree = ss.KDTree(Tex_Object.getVertices_3D())
-
+#
+# calc ICP loss between a pair of vertices (srcVerts, trgtVerts)
+#
+def Loss(srcVerts, trgtVerts):
     LIMIT_POINT_NUM = 2*10**5
+    SAMPLE_POINT_NUM = min(LIMIT_POINT_NUM, len( srcVerts ))
+    sourceSamplesIndices = random.sample( range( len( srcVerts ) ), SAMPLE_POINT_NUM )
 
-    if len( CT_vertices ) >LIMIT_POINT_NUM:
-        SAMPLE_POINT_NUM = LIMIT_POINT_NUM
-    else:
-        SAMPLE_POINT_NUM = len( CT_vertices )
-
-    sourceSamplesIndices = random.sample( range( len( CT_vertices ) ),SAMPLE_POINT_NUM )
-
-    err = 0.0
-    err = np.mean( target_KDTree.query(CT_vertices[sourceSamplesIndices])[0] )
-
+    target_KDTree = ss.KDTree( trgtVerts )
+    err = np.mean( target_KDTree.query( srcVerts[sourceSamplesIndices] )[0] )
     return err
 
 
-def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
+
+#
+# Rotate( CT_Object ) = Tex_Objectとなる Rotationを計算
+#
+def nearestModel(CT_Object, Tex_Object, CT_PCARot, TexPCARot):
 
     CT_Center = CT_Object.getPosition_3D()
     #重心座標系に直すための行列
@@ -96,7 +105,7 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
 
         CT_Object.linerConversion( np.dot( transMat2,np.dot( Rot,transMat1 ) ) )
 
-        err = Loss(CT_Object,Tex_Object)
+        err = Loss(CT_Object.getVertices_3D(), Tex_Object.getVertices_3D())
 
 
         #debug
@@ -130,97 +139,81 @@ def nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot):
         pass
 
 
-def positionfit(CTfilepath,Texturefilepath,Savefilepath,check,var = 1.0):
+
+
+
+
+def positionfit(CTfilepath,　Texturefilepath,　Savefilepath,　doManualScaling = False,　manualScaling = 1.0):
+    #load files
     try:
-        CT_Object  = Object_3D(CTfilepath)
+        CT_Object  = Object_3D(CTfilepath     )
         Tex_Object = Object_3D(Texturefilepath)
     except :
         print("file input err\n")
         return False
 
-    TexPCA = PCA()
-    TexPCA.fit(Tex_Object.getVertices_3D())
+    #0. 両者を原点に移動
+    texVerts = Tex_Object.getVertices()
+    texCenter= calcCenter(texVerts)
+    texVerts-= texCenter
 
-    CTPCA = PCA()
-    CTPCA.fit(CT_Object.getVertices_3D())
+    ctVerts  = CT_Object .getVertices()
+    ctCenter = calcCenter(ctVerts)
+    ctVerts -= ctCenter
 
+    #1. scalingする
+    if ( doManualScaling ):
+        scl = manualScaling
+    else :
+        scl = meanDistRatio_FromGravityCenter(Tex_Object.getVertices(), CT_Object.getVertices())
+    ctVerts *= scl
 
-    Tex_Cov = TexPCA.get_covariance()
-    CT_Cov  = CTPCA .get_covariance()
+    #2. PCA計算 --> rotation
+    texPCA = PCA()
+    ctPCA  = PCA()
+    texPCA.fit( Tex_Object.getVertices())
+    ctPCA.fit ( CT_Object.getVertices())
+    texRot = np.array( texPCA.components_) # (v1,v2,v3)^T
+    ct_Rot = np.array( ctPCA.components_ ) # (v1,v2,v3)^T
 
+    if np.linalg.det(texRot) < 0:
+        print("invert tex rot")
+        texRot[2] = (-1 * texRot[2])
 
-    eig1_val,eig1_vec = np.linalg.eig(Tex_Cov)
-    eig2_val,eig2_vec = np.linalg.eig(CT_Cov )
+    if np.linalg.det(ct_Rot) < 0:
+        print("invert ct rot")
+        ct_Rot[2] = (-1 * ct_Rot[2])
 
-    eig1_val = np.sort(eig1_val)
-    eig2_val = np.sort(eig2_val)
+    ctVerts = np.dot(texRot.T * ct_Rot, ctVerts.T).T
 
-    print("Texture")
-    print(eig1_val )
-    print("\nCT"   )
-    print(eig2_val )
+    #3. 180 deg rotation
+    I_Mat = np.diag([ 1.0, 1.0, 1.0,1.0])
+    Rot_X = np.diag([ 1.0,-1.0,-1.0,1.0])
+    Rot_Y = np.diag([-1.0, 1.0,-1.0,1.0])
+    Rot_Z = np.diag([-1.0,-1.0, 1.0,1.0])
 
-    if not(check):
-        var = varRatio(Tex_Object.getVertices_3D(), CT_Object.getVertices_3D())
-    print("\n" + str(var))
+    nearlestConversionMat = None
+    minErr = -1.0
+    tmptmpCtVerts = np.zeros(0)
 
-    scaleMat  = np.array([ [var,0.0,0.0,0.0],
-                           [0.0,var,0.0,0.0],
-                           [0.0,0.0,var,0.0],
-                           [0.0,0.0,0.0,1.0] ])
+    for Rot in [I_Mat,Rot_X,Rot_Y,Rot_Z]:
+        tmpCtVerts = np.dot( Rot, cvVerts.deepcopy().T).T
+        err = Loss(tmpCtVerts, texVerts)
 
-    CT_Center  = CT_Object .getPosition_3D()
-    Tex_Center = Tex_Object.getPosition_3D()
+        print("err = ",err)
+        if err < minErr or minErr < 0:
+            minErr = err
+            tmptmpCtVerts = tmpCtVerts.deepcopy()
 
-    transMat1 = np.array([ [1.0,0.0,0.0,-CT_Center[0]],
-                           [0.0,1.0,0.0,-CT_Center[1]],
-                           [0.0,0.0,1.0,-CT_Center[2]],
-                           [0.0,0.0,0.0,1.0          ] ])
+    ctVerts = tmptmpCtVerts
 
-    transMat2 = np.array([ [1.0,0.0,0.0,Tex_Center[0]],
-                           [0.0,1.0,0.0,Tex_Center[1]],
-                           [0.0,0.0,1.0,Tex_Center[2]],
-                           [0.0,0.0,0.0,1.0          ] ])
-    #拡大縮小、重心合わせだけ最初にやっておく
-    CT_Object.linerConversion( np.dot( transMat2,np.dot(scaleMat,transMat1) ) )
-
-
-    TexPCARot = np.array(TexPCA.components_).transpose()
-
-    TexPCARot = np.array([ [TexPCARot[0][0],TexPCARot[0][1],TexPCARot[0][2],0.0],
-                           [TexPCARot[1][0],TexPCARot[1][1],TexPCARot[1][2],0.0],
-                           [TexPCARot[2][0],TexPCARot[2][1],TexPCARot[2][2],0.0],
-                           [0.0            ,0.0            ,0.0            ,1.0]])
-
-    CT_PCARot  = np.array(CTPCA.components_ )
-
-    CT_PCARot = np.array([ [CT_PCARot[0][0],CT_PCARot[0][1],CT_PCARot[0][2],0.0],
-                           [CT_PCARot[1][0],CT_PCARot[1][1],CT_PCARot[1][2],0.0],
-                           [CT_PCARot[2][0],CT_PCARot[2][1],CT_PCARot[2][2],0.0],
-                           [0.0            ,0.0            ,0.0            ,1.0] ])
-
-
-    if np.linalg.det(TexPCARot) < 0:
-        print("tex debug")
-        TexPCARot[:,0] = (-1 * TexPCARot[:,0]).T
-
-    if np.linalg.det(CT_PCARot) < 0:
-        print("CT debug")
-        CT_PCARot[0] = -1 * CT_PCARot[0]
-
-
-    start = time.time()
-
-    nearlestModel(CT_Object,Tex_Object,CT_PCARot,TexPCARot)
-
-    end   = time.time() - start
-    print ("\nelapsed_time:{0}".format(end) + "[sec]\n")
-
-
-    icp = ICP(Tex_Object.getVertices_3D(), CT_Object.getVertices_3D())
+    #icp
+    icp = ICP( texVerts, ctVerts)
     new_vertices = icp.calculate(30)
-    CT_Object.setVertices_3D(new_vertices)
+    new_vertices += texCenter
+    CT_Object.setVertices(new_vertices)
 
+    #todo normal
 
     try:
         print("file save")

@@ -1,14 +1,21 @@
+# from
+# http://nghiaho.com/?page_id=671
+# http://clientver2.hatenablog.com/entry/2015/11/27/160814
+
 from scipy.spatial import KDTree
 import numpy as np
 import random
 import time
 
+
+
+
+# MatA, MatB --> pair of vertices (same size and has correspondences)
+# return rigid transformation (Rotation and transformation)
 def calcRigidTranformation(MatA, MatB):
     A, B = np.copy(MatA), np.copy(MatB)
-
     centroid_A = np.mean(A, axis=0)
     centroid_B = np.mean(B, axis=0)
-
     A -= centroid_A
     B -= centroid_B
 
@@ -20,7 +27,7 @@ def calcRigidTranformation(MatA, MatB):
     return R, T
 
 
-class ICP(object):
+class ICP( object ):
     def __init__(self, targetPoints, sourcePoints):
         self.targetPoints = targetPoints
         self.sourcePoints = sourcePoints
@@ -42,9 +49,9 @@ class ICP(object):
             samplePoints = old_points[sourceSamplesIndices]
 
             neighbor_idx = self.kdtree.query(samplePoints)[1]
-            targets = self.targetPoints[neighbor_idx]
-            R, T = calcRigidTranformation(samplePoints, targets)
-            new_points = np.dot(R, old_points.T).T + T
+            targets      = self.targetPoints[neighbor_idx]
+            R, T         = calcRigidTranformation(samplePoints, targets)
+            new_points   = np.dot(R, old_points.T).T + T
 
             end = time.time() - start
             print ("\nelapsed_time:{0}".format(end) + "[sec]\n")

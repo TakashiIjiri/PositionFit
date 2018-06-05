@@ -50,7 +50,7 @@ def loadOBJ(fliePath):
                         indices.append(i)
                     except ValueError:
                         pass
-                        
+
                 count = 0
                 if numVertices > 0:
                     fvID.append(int(w[ indices[count] ])-1)
@@ -73,13 +73,4 @@ def loadOBJ(fliePath):
     print ("numNormals: ", numNormals)
     print ("numFaces: ", numFaces)
     print ("\n")
-    return vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors
-
-
-def loadOBJ_4D(filepath):
-    vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors = loadOBJ(filepath)
-
-    for i in range(len(vertices)):
-        vertices[i] = np.append( vertices[i],[1] )
-
     return vertices, uvs, normals, faceVertIDs, uvIDs, normalIDs, vertexColors
